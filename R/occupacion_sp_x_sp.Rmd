@@ -1,0 +1,244 @@
+---
+title: "Analisis de Ocupación, Agroforestería para la Conservación"
+author: "Diego J. Lizcano, Angelica Diaz-Pulido"
+date: "28/1/2020"
+output:
+  html_document:
+    theme: flatly
+    highlight: pygments
+    code_folding: hide
+    df_print: paged
+    social: [ "twitter", "facebook" ]
+    fig_caption: true
+    toc: true
+    toc_float: true
+    smooth_scroll: true
+link-citations: yes
+csl: C:/Users/diego.lizcano/Box Sync/CodigoR/Cambio_Meta/ecology.csl
+bibliography: C:/Users/diego.lizcano/Box Sync/CodigoR/Cambio_Meta/AAA.bib
+toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval=TRUE, echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+```{js logo-js, echo=FALSE, eval=FALSE}
+$(document).ready(function() {
+  $('#header').parent().prepend('<div id=\"logo\"><img src=\"C:/Users/diego.lizcano/Box Sync/CodigoR/Biodiv_Caqueta/img/Agroforesteria_small.png\" style=\"position:absolute; top:0; right:0; padding:20px; height:120px\"></div>');
+  $('#header').css('margin-right', '120px')
+});
+```
+
+<style>
+#TOC {
+  background: url("C:/Users/diego.lizcano/Box Sync/CodigoR/Biodiv_Caqueta/img/Agroforesteria_small.png");
+  background-size: contain;
+  padding-top: 80px !important;
+  background-repeat: no-repeat;
+}
+</style>
+
+```{r loadpackages}
+library(rgdal) # basic maps and coords
+library(maptools) # tools to convert
+# library(unmarked)
+library (sf) # spatial maps
+library (mapview) # nice view
+library (spatstat) # distance maps
+library (raster) # raster 
+library (readxl) # read excel data
+library (tidyverse) # Data handling
+library (dplyr) # Data frames handling
+library (ggmap)
+
+
+```
+
+
+
+```{r load_data}
+
+
+##### extra functions
+source("C:/Users/diego.lizcano/Box Sync/CodigoR/Biodiv_Caqueta/R/TEAM_code.R")
+source("C:/Users/diego.lizcano/Box Sync/CodigoR/Biodiv_Caqueta/R/calendar.R")
+
+#####
+datos.raw <- read_excel("C:/Users/diego.lizcano/Box Sync/CodigoR/Biodiv_Caqueta/data/Datos_cameratrap_Caqueta_fixed.xlsx")
+
+
+```
+
+
+# Lugar del muestreo
+
+```{r camera_map}
+
+# datos.raw
+
+# get the centroid
+centercoord<- c(mean(as.numeric( datos.raw$Longitude)), 
+                mean(as.numeric( datos.raw$Latitude)))
+
+
+elevation<-getData('SRTM',lon=centercoord[1], lat=centercoord[2])
+
+e<-extent (-76.4, -75.7, 1.05, 1.65) # make the extent
+elevation.crop<-crop(elevation, e) # cut elevation to small window
+
+# plot(elevation.crop)
+# points(datos.raw$Longitude, datos.raw$Latitude, add=T)
+
+datos.raw$Lon <- as.numeric(datos.raw$Longitude)
+datos.raw$Lat <- as.numeric(datos.raw$Latitude)
+
+# make a large sf object
+datos.raw_sf = st_as_sf(datos.raw, coords = c("Lon", "Lat"), 
+                        crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+mapview(datos.raw_sf)
+
+
+```
+
+
+
+
+# Duración del muestreo
+
+Las trampas cámara permanecieron activas desde mediados de septiembre 2019 hasta comienzos de diciembre 2019.
+
+```{r calendar1,cache=FALSE,warning=FALSE,eval=TRUE, echo=FALSE,fig.height=11,fig.width=8,message=FALSE}
+f.calendar.yr(dataset = datos.raw, yr_toplot = 1)
+
+```
+ 
+Calendario fotografias, inicio y finalizacion de cada cámara
+
+# Especies registradas
+
+Las especies registradas en todo em muestreo fueron xxx
+
+
+```{r sps,cache=TRUE,warning=FALSE,eval=TRUE, echo=FALSE,results='asis'}
+# library(xtable)
+
+mat.per.sp<-f.matrix.creator2(data = datos.raw, year = 2019)
+mat.per.sp <- mat.per.sp[-1] # elimina NA 
+sp.names<-names(mat.per.sp) # species names
+
+
+# counting how many (total) records per species by all days
+cont.per.sp<-data.frame(row.names = sp.names)
+for (i in 1:length(mat.per.sp)){
+  cont.per.sp[i,1]<-sum(apply(as.data.frame(mat.per.sp [[i]]),FUN=sum,na.rm=T, MARGIN = 1))
+}
+
+cont.per.sp$especie<-rownames(cont.per.sp)
+colnames(cont.per.sp)<-c("Numero_de_fotos","especie")
+# print(as.data.frame(arrange(df = cont.per.sp, desc(Numero_de_fotos))))
+
+xtable(as.data.frame(arrange(df = cont.per.sp, desc(Numero_de_fotos))))
+
+```
+
+
+## Mamíferos en las cámaras
+
+Por géneros
+
+```{r view_mammal}
+## Select Mammals
+
+datos.raw.mam <- filter(datos.raw, Class=="MAMMALIA")
+
+######################
+## Google key
+## register_google(key = "AIzaSyDJmcl2kNxd_-qbmajoHobxa6G-RFR_f8s", write = TRUE)
+
+overlay <- stat_density2d(
+  aes(x = Lon, y = Lat, fill = ..level.., alpha = ..level..),
+  bins = 10, geom = "polygon",
+  data = datos.raw.mam) 
+
+### add camera traps
+map <- get_map(c(-76.058971, 1.335207), zoom = 10, 
+               source = 'google', maptype = "terrain", color ="bw")
+# ggmap(map) #, fullpage = TRUE)
+
+
+g1<-  ggmap(map, extent = 'device') + geom_point(data = datos.raw.mam, 
+                                                 aes(x=Lon, y=Lat), 
+                                                 colour = "red", size = I(2),  
+                                                 alpha = 1/10, na.rm = TRUE) +
+                                            overlay + 
+                                scale_fill_gradient(low = "blue", high = "red")
+
+# con google
+g3<- g1 + overlay + scale_fill_gradient(low = "blue", high = "red") + 
+        facet_wrap(~ Genus, ncol = 7)
+
+g3
+
+
+
+```
+
+
+## Aves en las cámaras
+
+Por géneros
+
+```{r view_bird}
+## Select Mammals
+
+datos.raw.ave <- filter(datos.raw, Class=="AVES")
+
+######################
+## Google key
+## register_google(key = "AIzaSyDJmcl2kNxd_-qbmajoHobxa6G-RFR_f8s", write = TRUE)
+
+overlay <- stat_density2d(
+  aes(x = Lon, y = Lat, fill = ..level.., alpha = ..level..),
+  bins = 10, geom = "polygon",
+  data = datos.raw.ave) 
+
+### add camera traps
+map <- get_map(c(-76.058971, 1.335207), zoom = 10, 
+               source = 'google', maptype = "terrain", color ="bw")
+# ggmap(map) #, fullpage = TRUE)
+
+
+g1<-  ggmap(map, extent = 'device') + geom_point(data = datos.raw.ave, 
+                                                 aes(x=Lon, y=Lat), 
+                                                 colour = "red", size = I(2),  
+                                                 alpha = 1/10, na.rm = TRUE) +
+                                            overlay + 
+                                scale_fill_gradient(low = "blue", high = "red")
+
+# con google
+g3<- g1 + overlay + scale_fill_gradient(low = "blue", high = "red") + 
+        facet_wrap(~ Genus, ncol = 8)
+
+g3
+
+
+
+```
+
+
+
+
+
+# References
+
+[^1]: GCS <http://ganaderiacolombianasostenible.co/>
+[^2]: Available from <http://http://www.rstudio.org/>
+[^3]: R <https://cran.r-project.org/>
+
+# Información de la sesión en R.
+
+```{r}
+print(sessionInfo(), locale = FALSE)
+```
