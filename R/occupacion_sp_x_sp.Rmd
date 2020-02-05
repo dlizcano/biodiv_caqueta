@@ -155,7 +155,7 @@ datos.raw.mam <- filter(datos.raw, Class=="MAMMALIA")
 
 ######################
 ## Google key
-## register_google(key = "AIzaSyDJmcl2kNxd_-qbmajoHobxa6G-RFR_f8s", write = TRUE)
+## register_google(key = "your key", write = TRUE)
 
 overlay <- stat_density2d(
   aes(x = Lon, y = Lat, fill = ..level.., alpha = ..level..),
